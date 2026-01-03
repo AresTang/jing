@@ -103,13 +103,18 @@
         </section>
     </main>
 
-    <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="handleIframeLoad()"></iframe>
-
-    <script>
+   <script>
         var submitted = false;
         const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTp-3jXGhNPGZhYixtC9vJ1GFCyBYRqU856YVEkUXJaTpsnNg48N3AMPsvbuAicL9XEFS00ibi0Ioh9/pub?output=csv';
 
-        // 1. 處理表單提交
+        // 必須寫在最前面，讓 iframe 呼叫
+        window.handleIframeLoad = function() {
+            if (submitted) {
+                alert('✨ 紀錄成功！資料已飛向雲端 ✨');
+                window.location.reload();
+            }
+        };
+
         function handleFormSubmit() {
             submitted = true;
             const btn = document.getElementById('submit-btn');
@@ -119,15 +124,6 @@
             }
         }
 
-        // 2. 表單完成後的動作
-        window.handleIframeLoad = function() {
-            if (submitted) {
-                alert('✨ 紀錄成功！資料已飛向雲端 ✨');
-                window.location.reload();
-            }
-        };
-
-        // 3. 切換分頁
         function openTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -135,7 +131,6 @@
             document.getElementById('btn-' + tabName).classList.add('active');
         }
 
-        // 4. 從試算表抓取並計算資料
         async function fetchData() {
             try {
                 const response = await fetch(csvUrl + '&t=' + new Date().getTime());
@@ -150,10 +145,9 @@
                     const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/"/g, ""));
                     if (cols.length < 2) return;
 
-                    // 根據你的 Console 診斷：金額是 [1], 付款人是 [3]
                     const amount = parseFloat(cols[1]) || 0; 
                     const payer = cols[3] || "";             
-                    const isSettled = cols[5] || ""; // 預留第六格放「是」來沖帳
+                    const isSettled = cols[5] || ""; 
 
                     totalSpent += amount;
 
@@ -163,7 +157,6 @@
                     }
                 });
 
-                // 更新畫面文字
                 const elBalance = document.getElementById('wallet-balance');
                 const elPig = document.getElementById('pig-reimbursement');
                 const elClean = document.getElementById('clean-reimbursement');
@@ -173,17 +166,20 @@
                 if (elClean) elClean.innerText = '$' + cleanPaid;
 
                 console.log("計算完成，畫面已更新");
-
             } catch (e) {
                 console.error("資料讀取發生錯誤:", e);
-                document.getElementById('wallet-balance').innerText = "連線失敗";
+                if(document.getElementById('wallet-balance')) {
+                    document.getElementById('wallet-balance').innerText = "連線失敗";
+                }
             }
         }
 
-        // 5. 確保網頁載入後才執行
         window.onload = function() {
             fetchData();
         };
     </script>
+
+    <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="handleIframeLoad()"></iframe>
+
 </body>
 </html>
