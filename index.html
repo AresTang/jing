@@ -121,20 +121,40 @@
         btn.disabled = true;
     }
 
-    async function fetchData() {
+  async function fetchData() {
         try {
             const response = await fetch(csvUrl + '&t=' + new Date().getTime());
             const data = await response.text();
             const rows = data.split('\n').slice(1);
 
+            let totalSpent = 0;
+            let pigPaid = 0;
+            let cleanPaid = 0;
+
             rows.forEach((row, index) => {
                 const cols = row.split(',').map(c => c.trim().replace(/"/g, ""));
-                if (cols.length < 2) return;
-                
-                // 請看 Console 這裡印出的內容，數數看你的金額在第幾個括號裡
-                console.log(`第 ${index+1} 筆原始內容:`, cols);
+                if (cols.length < 3) return;
+
+                // --- 根據你的 Console 資料重新對準 ---
+                const amount = parseFloat(cols[1]) || 0; // 金額在第 2 格 [1]
+                const payer = cols[3] || "";             // 付款人在第 4 格 [3]
+                const isSettled = cols[5] || "";         // 已出款在第 6 格 [5]
+
+                totalSpent += amount;
+
+                if (isSettled !== "是") {
+                    if (payer === "濟豬") pigPaid += amount;
+                    if (payer === "濟淨") cleanPaid += amount;
+                }
             });
-        } catch (e) { console.error(e); }
+
+            // 更新畫面上的數字
+            document.getElementById('wallet-balance').innerText = '$' + (15000 - totalSpent);
+            document.getElementById('pig-reimbursement').innerText = '$' + pigPaid;
+            document.getElementById('clean-reimbursement').innerText = '$' + cleanPaid;
+        } catch (e) {
+            console.error("抓取失敗:", e);
+        }
     }
     fetchData();
 
