@@ -1,0 +1,43 @@
+<div class="bg-white p-4 rounded-xl shadow-sm mb-6 text-sm">
+    <form action="https://docs.google.com/forms/u/1/d/e/1FAIpQLSd3pRv9-m4Tkd0duGqCn3YkUb_cTYz2oP3GY5Ht5WwPOVG1KA/formResponse" 
+          method="POST" 
+          target="hidden_iframe" 
+          onsubmit="submitted=true;">
+
+        <div class="mb-2">
+            <label class="block text-gray-500 mb-1">花費日期</label>
+            <input type="date" name="entry.2029544290" class="w-full border p-2 rounded" required>
+        </div>
+
+        <div class="mb-2">
+            <label class="block text-gray-500 mb-1">金額</label>
+            <input type="number" name="entry.1782400014" placeholder="輸入金額" class="w-full border p-2 rounded" required>
+        </div>
+
+        <div class="mb-2">
+            <label class="block text-gray-500 mb-1">類別</label>
+            <select name="entry.1539739800" class="w-full border p-2 rounded">
+                <option value="日用">日用</option>
+                <option value="設備">設備</option>
+                <option value="飲食">飲食</option>
+                <option value="旅遊">旅遊</option>
+                <option value="社交">社交</option>
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-gray-500 mb-1">付款人</label>
+            <div class="flex justify-around py-2 bg-gray-50 rounded">
+                <label><input type="radio" name="entry.1122156127" value="濟豬" required> 濟豬</label>
+                <label><input type="radio" name="entry.1122156127" value="濟淨"> 濟淨</label>
+                <label><input type="radio" name="entry.1122156127" value="共同錢包"> 共同</label>
+            </div>
+        </div>
+
+        <button type="submit" class="w-full bg-green-500 text-white py-2 rounded-lg font-bold">
+            卍o爻記錄一筆o卍
+        </button>
+    </form>
+</div>
+
+<iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="if(submitted) {alert('紀錄成功！錢錢飛進去試算表囉！');}"></iframe>
