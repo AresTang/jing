@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>濟豬&濟淨的兩人生活</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <script>
         var submitted = false;
         const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTp-3jXGhNPGZhYixtC9vJ1GFCyBYRqU856YVEkUXJaTpsnNg48N3AMPsvbuAicL9XEFS00ibi0Ioh9/pub?output=csv';
+        let expenseChart;
 
-        // 核心功能：表單提交成功的彈窗
         window.handleIframeLoad = function() {
             if (submitted) {
                 alert('✨ 紀錄成功！資料已飛向雲端 ✨');
@@ -21,17 +22,7 @@
         function handleFormSubmit() {
             submitted = true;
             const btn = document.getElementById('submit-btn');
-            if(btn) {
-                btn.innerText = "傳送中...";
-                btn.disabled = true;
-            }
-        }
-
-        function openTab(tabName) {
-            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById(tabName).classList.add('active');
-            document.getElementById('btn-' + tabName).classList.add('active');
+            if(btn) { btn.innerText = "傳送中..."; btn.disabled = true; }
         }
 
         async function fetchData() {
@@ -43,40 +34,71 @@
                 let totalSpent = 0;
                 let pigPaid = 0;
                 let cleanPaid = 0;
+                let categoryData = {};
+                let recentHtml = "";
 
-                rows.forEach((row, index) => {
+                rows.reverse().forEach((row, index) => {
                     const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/"/g, ""));
                     if (cols.length < 2) return;
 
                     const amount = parseFloat(cols[1]) || 0; 
+                    const cat = cols[2] || "未分類";
                     const payer = cols[3] || "";             
                     const isSettled = cols[5] || ""; 
 
                     totalSpent += amount;
-
                     if (isSettled !== "是") {
                         if (payer === "濟豬") pigPaid += amount;
                         if (payer === "濟淨") cleanPaid += amount;
                     }
+
+                    // 收集圓餅圖數據
+                    categoryData[cat] = (categoryData[cat] || 0) + amount;
+
+                    // 製作最近 5 筆清單
+                    if (index < 5) {
+                        recentHtml += `<div class="flex justify-between text-sm border-b py-2">
+                            <span>${cols[4]} ${cat}</span>
+                            <span class="font-bold text-gray-700">$${amount} (${payer})</span>
+                        </div>`;
+                    }
                 });
 
-                const elBalance = document.getElementById('wallet-balance');
-                const elPig = document.getElementById('pig-reimbursement');
-                const elClean = document.getElementById('clean-reimbursement');
+                // 更新數字
+                document.getElementById('wallet-balance').innerText = '$' + (15000 - totalSpent);
+                document.getElementById('pig-reimbursement').innerText = '$' + pigPaid;
+                document.getElementById('clean-reimbursement').innerText = '$' + cleanPaid;
+                document.getElementById('recent-list').innerHTML = recentHtml;
 
-                if (elBalance) elBalance.innerText = '$' + (15000 - totalSpent);
-                if (elPig) elPig.innerText = '$' + pigPaid;
-                if (elClean) elClean.innerText = '$' + cleanPaid;
-
-                console.log("✅ 計算完成，畫面已更新");
-            } catch (e) {
-                console.error("❌ 資料讀取失敗:", e);
-            }
+                updateChart(categoryData);
+                console.log("✅ 數據與圖表更新完成");
+            } catch (e) { console.error("讀取失敗:", e); }
         }
 
-        window.onload = function() {
-            fetchData();
-        };
+        function updateChart(catData) {
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            if (expenseChart) expenseChart.destroy();
+            expenseChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(catData),
+                    datasets: [{
+                        data: Object.values(catData),
+                        backgroundColor: ['#6366f1', '#f87171', '#fbbf24', '#34d399', '#a78bfa']
+                    }]
+                },
+                options: { plugins: { legend: { position: 'bottom' } } }
+            });
+        }
+
+        function openTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            document.getElementById('btn-' + tabName).classList.add('active');
+        }
+
+        window.onload = fetchData;
     </script>
 
     <style>
@@ -99,85 +121,58 @@
     </header>
 
     <main class="max-w-md mx-auto p-4 pb-20">
-        <section id="mission" class="tab-content">
-            <h2 class="text-lg font-bold">任務清單</h2>
-            <p class="text-purple-600 text-sm">卍乂為了星星奮起吧卍乂</p>
-            <p class="mt-4 text-gray-400">任務功能開發中...</p>
-        </section>
-
         <section id="money" class="tab-content active">
-            <div class="mb-4">
-                <h2 class="text-lg font-bold text-gray-800">金錢管理</h2>
-                <p class="text-green-600 text-xs italic">卍o爻錢命定o卍</p>
+            <div class="bg-indigo-600 text-white p-5 rounded-2xl shadow-lg text-center mb-6">
+                <p class="text-xs opacity-80">本月共同錢包餘額</p>
+                <p id="wallet-balance" class="text-3xl font-bold mt-1">載入中...</p>
             </div>
 
-            <div class="grid grid-cols-1 gap-3 mb-6">
-                <div class="bg-indigo-600 text-white p-5 rounded-2xl shadow-lg text-center">
-                    <p class="text-xs opacity-80">本月共同錢包餘額 (預算15000)</p>
-                    <p id="wallet-balance" class="text-3xl font-bold mt-1">載入中...</p>
+            <div class="bg-white p-5 rounded-2xl shadow-sm mb-6">
+                <h3 class="font-bold mb-4 text-gray-700 text-center">📊 支出比例</h3>
+                <canvas id="expenseChart" width="200" height="200"></canvas>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-red-400 text-center">
+                    <p class="text-[10px] text-gray-500 uppercase">應撥給濟豬</p>
+                    <p id="pig-reimbursement" class="text-lg font-bold text-gray-800">$0</p>
                 </div>
-                <div class="flex gap-3">
-                    <div class="bg-white flex-1 p-4 rounded-xl shadow-sm border-l-4 border-red-400">
-                        <p class="text-[10px] text-gray-500 uppercase">應撥給濟豬</p>
-                        <p id="pig-reimbursement" class="text-lg font-bold text-gray-800">$0</p>
-                    </div>
-                    <div class="bg-white flex-1 p-4 rounded-xl shadow-sm border-l-4 border-blue-400">
-                        <p class="text-[10px] text-gray-500 uppercase">應撥給濟淨</p>
-                        <p id="clean-reimbursement" class="text-lg font-bold text-gray-800">$0</p>
-                    </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-400 text-center">
+                    <p class="text-[10px] text-gray-500 uppercase">應撥給濟淨</p>
+                    <p id="clean-reimbursement" class="text-lg font-bold text-gray-800">$0</p>
                 </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm mb-6">
+                <h3 class="font-bold mb-2 text-gray-700">📜 最近 5 筆花費</h3>
+                <div id="recent-list" class="divide-y text-gray-600">載入中...</div>
             </div>
 
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
-                <h3 class="font-bold mb-4 text-gray-700">📝 新增花費</h3>
+                <h3 class="font-bold mb-4 text-gray-700">📝 新增紀錄</h3>
                 <form action="https://docs.google.com/forms/u/1/d/e/1FAIpQLSd3pRv9-m4Tkd0duGqCn3YkUb_cTYz2oP3GY5Ht5WwPOVG1KA/formResponse" 
                       method="POST" target="hidden_iframe" onsubmit="handleFormSubmit();">
-                    
-                    <div class="mb-3">
-                        <label class="block text-xs text-gray-400 mb-1">花費日期</label>
-                        <input type="date" name="entry.2029544290" class="w-full border-gray-200 border p-2 rounded-lg" required>
+                    <input type="date" name="entry.2029544290" class="w-full border-gray-200 border p-2 rounded-lg mb-3 text-sm" required>
+                    <input type="number" name="entry.1782400014" placeholder="金額" class="w-full border-gray-200 border p-2 rounded-lg mb-3 text-sm" required>
+                    <select name="entry.1539739800" class="w-full border-gray-200 border p-2 rounded-lg mb-3 text-sm">
+                        <option value="飲食">飲食</option><option value="日用">日用</option>
+                        <option value="設備">設備</option><option value="旅遊">旅遊</option>
+                        <option value="社交">社交</option>
+                    </select>
+                    <div class="flex justify-between bg-gray-50 p-2 rounded-lg mb-4">
+                        <label class="text-xs"><input type="radio" name="entry.1122156127" value="濟豬" required> 濟豬</label>
+                        <label class="text-xs"><input type="radio" name="entry.1122156127" value="濟淨"> 濟淨</label>
+                        <label class="text-xs"><input type="radio" name="entry.1122156127" value="共同錢包"> 共同</label>
                     </div>
-
-                    <div class="mb-3">
-                        <label class="block text-xs text-gray-400 mb-1">金額</label>
-                        <input type="number" name="entry.1782400014" placeholder="輸入金額" class="w-full border-gray-200 border p-2 rounded-lg" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="block text-xs text-gray-400 mb-1">類別</label>
-                        <select name="entry.1539739800" class="w-full border-gray-200 border p-2 rounded-lg">
-                            <option value="日用">日用</option>
-                            <option value="設備">設備</option>
-                            <option value="飲食">飲食</option>
-                            <option value="旅遊">旅遊</option>
-                            <option value="社交">社交</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-5">
-                        <label class="block text-xs text-gray-400 mb-2">付款人</label>
-                        <div class="flex justify-between bg-gray-50 p-2 rounded-lg">
-                            <label class="flex items-center gap-1 text-sm"><input type="radio" name="entry.1122156127" value="濟豬" required> 濟豬</label>
-                            <label class="flex items-center gap-1 text-sm"><input type="radio" name="entry.1122156127" value="濟淨"> 濟淨</label>
-                            <label class="flex items-center gap-1 text-sm"><input type="radio" name="entry.1122156127" value="共同錢包"> 共同</label>
-                        </div>
-                    </div>
-
-                    <button id="submit-btn" type="submit" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-md transition">
-                        卍o爻記錄一筆o卍
-                    </button>
+                    <button id="submit-btn" type="submit" class="w-full bg-indigo-500 text-white py-3 rounded-xl font-bold shadow-md">卍o爻記錄一筆o卍</button>
                 </form>
             </div>
         </section>
 
-        <section id="body" class="tab-content">
-            <h2 class="text-lg font-bold">體格監測</h2>
-            <p class="text-red-600 text-sm">斬卍凱蒂貓卍佛</p>
-            <p class="mt-4 text-gray-400">體魄功能開發中...</p>
-        </section>
+        <section id="mission" class="tab-content text-center py-10"><p class="text-gray-400">任務功能開發中...</p></section>
+        <section id="body" class="tab-content text-center py-10"><p class="text-gray-400">體魄功能開發中...</p></section>
     </main>
 
     <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="if(window.handleIframeLoad) handleIframeLoad()"></iframe>
-
 </body>
 </html>
