@@ -102,82 +102,88 @@
             <p class="mt-4 text-gray-400">體魄功能開發中...</p>
         </section>
     </main>
-   <script>
-    var submitted = false;
-    const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTp-3jXGhNPGZhYixtC9vJ1GFCyBYRqU856YVEkUXJaTpsnNg48N3AMPsvbuAicL9XEFS00ibi0Ioh9/pub?output=csv';
 
-    // 提前定義好功能
-    window.handleIframeLoad = function() {
-        if (submitted) {
-            alert('✨ 紀錄成功！資料已飛向雲端 ✨');
-            window.location.reload();
-        }
-    };
+    <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="handleIframeLoad()"></iframe>
 
-    function handleFormSubmit() {
-        submitted = true;
-        const btn = document.getElementById('submit-btn');
-        btn.innerText = "傳送中...";
-        btn.disabled = true;
-    }
-async function fetchData() {
-        try {
-            console.log("開始抓取資料...");
-            const response = await fetch(csvUrl + '&t=' + new Date().getTime());
-            const data = await response.text();
-            
-            // 檢查有沒有抓到東西
-            if (!data) {
-                console.error("抓到的資料是空的");
-                return;
+    <script>
+        var submitted = false;
+        const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTp-3jXGhNPGZhYixtC9vJ1GFCyBYRqU856YVEkUXJaTpsnNg48N3AMPsvbuAicL9XEFS00ibi0Ioh9/pub?output=csv';
+
+        // 1. 處理表單提交
+        function handleFormSubmit() {
+            submitted = true;
+            const btn = document.getElementById('submit-btn');
+            if(btn) {
+                btn.innerText = "傳送中...";
+                btn.disabled = true;
             }
-
-            const rows = data.split('\n').slice(1);
-            let totalSpent = 0;
-            let pigPaid = 0;
-            let cleanPaid = 0;
-
-            rows.forEach((row, index) => {
-                // 改用最簡單的逗號分割
-                const cols = row.split(',').map(c => c.trim().replace(/"/g, ""));
-                
-                // 只要有金額 (第2格) 就可以跑
-                if (cols.length < 2) return;
-
-                const amount = parseFloat(cols[1]) || 0; 
-                const payer = cols[3] || "";             
-                const isSettled = cols[4] ? cols[4] : ""; // 先暫時看第5或第6格
-
-                totalSpent += amount;
-
-                if (isSettled !== "是") {
-                    if (payer === "濟豬") pigPaid += amount;
-                    if (payer === "濟淨") cleanPaid += amount;
-                }
-            });
-
-            console.log("計算完成:", { totalSpent, pigPaid, cleanPaid });
-
-            // 強制更新畫面
-            document.getElementById('wallet-balance').innerText = '$' + (15000 - totalSpent);
-            document.getElementById('pig-reimbursement').innerText = '$' + pigPaid;
-            document.getElementById('clean-reimbursement').innerText = '$' + cleanPaid;
-
-        } catch (e) {
-            console.error("fetchData 發生錯誤:", e);
-            document.getElementById('wallet-balance').innerText = "連線失敗";
         }
-    }
-    fetchData();
 
-    function openTab(tabName) {
-        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        document.getElementById(tabName).classList.add('active');
-        document.getElementById('btn-' + tabName).classList.add('active');
-    }
-</script>
-<iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="handleIframeLoad()"></iframe>
+        // 2. 表單完成後的動作
+        window.handleIframeLoad = function() {
+            if (submitted) {
+                alert('✨ 紀錄成功！資料已飛向雲端 ✨');
+                window.location.reload();
+            }
+        };
 
+        // 3. 切換分頁
+        function openTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            document.getElementById('btn-' + tabName).classList.add('active');
+        }
+
+        // 4. 從試算表抓取並計算資料
+        async function fetchData() {
+            try {
+                const response = await fetch(csvUrl + '&t=' + new Date().getTime());
+                const data = await response.text();
+                const rows = data.split('\n').slice(1);
+
+                let totalSpent = 0;
+                let pigPaid = 0;
+                let cleanPaid = 0;
+
+                rows.forEach((row, index) => {
+                    const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/"/g, ""));
+                    if (cols.length < 2) return;
+
+                    // 根據你的 Console 診斷：金額是 [1], 付款人是 [3]
+                    const amount = parseFloat(cols[1]) || 0; 
+                    const payer = cols[3] || "";             
+                    const isSettled = cols[5] || ""; // 預留第六格放「是」來沖帳
+
+                    totalSpent += amount;
+
+                    if (isSettled !== "是") {
+                        if (payer === "濟豬") pigPaid += amount;
+                        if (payer === "濟淨") cleanPaid += amount;
+                    }
+                });
+
+                // 更新畫面文字
+                const elBalance = document.getElementById('wallet-balance');
+                const elPig = document.getElementById('pig-reimbursement');
+                const elClean = document.getElementById('clean-reimbursement');
+
+                if (elBalance) elBalance.innerText = '$' + (15000 - totalSpent);
+                if (elPig) elPig.innerText = '$' + pigPaid;
+                if (elClean) elClean.innerText = '$' + cleanPaid;
+
+                console.log("計算完成，畫面已更新");
+
+            } catch (e) {
+                console.error("資料讀取發生錯誤:", e);
+                document.getElementById('wallet-balance').innerText = "連線失敗";
+            }
+        }
+
+        // 5. 確保網頁載入後才執行
+        window.onload = function() {
+            fetchData();
+        };
+    </script>
 </body>
 </html>
