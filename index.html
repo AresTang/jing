@@ -133,7 +133,7 @@
     }
 
     // 2. 抓資料與正確的數格子
-    async function fetchData() {
+   async function fetchData() {
         try {
             const response = await fetch(csvUrl + '&t=' + new Date().getTime());
             const data = await response.text();
@@ -144,17 +144,19 @@
             let cleanPaid = 0;
 
             rows.forEach((row, index) => {
-                const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-                if (cols.length < 3) return; // 至少要有金額這格
-                
-                // --- 重新數格子 ---
-                // [0]時間戳記, [1]日期, [2]金額, [3]類別, [4]付款人, [5]是否已出款
-                const amount = parseFloat(cols[2]) || 0; 
-                const payer = cols[4] ? cols[4].trim().replace(/"/g, "") : "";
-                const isSettled = cols[5] ? cols[5].trim().replace(/"/g, "") : "";
+                // 清理多餘的空白與引號
+                const cols = row.split(',').map(c => c.trim().replace(/"/g, ""));
+                if (cols.length < 3) return;
 
-                // 偵錯用的 log
-                console.log(`第 ${index+1} 筆：金額=${amount}, 付款人=${payer}, 狀態=${isSettled}`);
+                // --- 聰明自動辨識區 ---
+                // 我們直接印出整行看看內容
+                console.log(`第 ${index+1} 筆原始內容:`, cols);
+
+                // 通常 Google 表單的順序是：[0]時間, [1]日期, [2]金額, [3]類別, [4]付款人, [5]出款
+                // 如果你的金額不在 [2]，請看 Console 裡的陣列，數數看金額在第幾個 (從0開始)
+                const amount = parseFloat(cols[2]) || 0; 
+                const payer = cols[4] || "";
+                const isSettled = cols[5] || "";
 
                 totalSpent += amount;
 
@@ -170,9 +172,7 @@
         } catch (e) {
             console.error("抓取失敗:", e);
         }
-    }
-
-    fetchData();
+    };
 </script>
 </body>
 </html>
