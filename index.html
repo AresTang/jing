@@ -102,28 +102,41 @@
             <p class="mt-4 text-gray-400">體魄功能開發中...</p>
         </section>
     </main>
-
-    <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="handleIframeLoad()"></iframe>
-
-    <script>
-    // 1. 先定義功能，確保網頁讀得到
+   <script>
     var submitted = false;
     const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTp-3jXGhNPGZhYixtC9vJ1GFCyBYRqU856YVEkUXJaTpsnNg48N3AMPsvbuAicL9XEFS00ibi0Ioh9/pub?output=csv';
 
-    function handleFormSubmit() {
-        submitted = true;
-        const btn = document.getElementById('submit-btn');
-        btn.innerText = "傳送中...請稍候";
-        btn.style.backgroundColor = "#9ca3af";
-        btn.disabled = true;
-    }
-
-    function handleIframeLoad() {
+    // 提前定義好功能
+    window.handleIframeLoad = function() {
         if (submitted) {
             alert('✨ 紀錄成功！資料已飛向雲端 ✨');
             window.location.reload();
         }
+    };
+
+    function handleFormSubmit() {
+        submitted = true;
+        const btn = document.getElementById('submit-btn');
+        btn.innerText = "傳送中...";
+        btn.disabled = true;
     }
+
+    async function fetchData() {
+        try {
+            const response = await fetch(csvUrl + '&t=' + new Date().getTime());
+            const data = await response.text();
+            const rows = data.split('\n').slice(1);
+
+            rows.forEach((row, index) => {
+                const cols = row.split(',').map(c => c.trim().replace(/"/g, ""));
+                if (cols.length < 2) return;
+                
+                // 請看 Console 這裡印出的內容，數數看你的金額在第幾個括號裡
+                console.log(`第 ${index+1} 筆原始內容:`, cols);
+            });
+        } catch (e) { console.error(e); }
+    }
+    fetchData();
 
     function openTab(tabName) {
         document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
@@ -131,48 +144,8 @@
         document.getElementById(tabName).classList.add('active');
         document.getElementById('btn-' + tabName).classList.add('active');
     }
-
-    // 2. 抓資料與正確的數格子
-   async function fetchData() {
-        try {
-            const response = await fetch(csvUrl + '&t=' + new Date().getTime());
-            const data = await response.text();
-            const rows = data.split('\n').slice(1);
-
-            let totalSpent = 0;
-            let pigPaid = 0;
-            let cleanPaid = 0;
-
-            rows.forEach((row, index) => {
-                // 清理多餘的空白與引號
-                const cols = row.split(',').map(c => c.trim().replace(/"/g, ""));
-                if (cols.length < 3) return;
-
-                // --- 聰明自動辨識區 ---
-                // 我們直接印出整行看看內容
-                console.log(`第 ${index+1} 筆原始內容:`, cols);
-
-                // 通常 Google 表單的順序是：[0]時間, [1]日期, [2]金額, [3]類別, [4]付款人, [5]出款
-                // 如果你的金額不在 [2]，請看 Console 裡的陣列，數數看金額在第幾個 (從0開始)
-                const amount = parseFloat(cols[2]) || 0; 
-                const payer = cols[4] || "";
-                const isSettled = cols[5] || "";
-
-                totalSpent += amount;
-
-                if (isSettled !== "是") {
-                    if (payer === "濟豬") pigPaid += amount;
-                    if (payer === "濟淨") cleanPaid += amount;
-                }
-            });
-
-            document.getElementById('wallet-balance').innerText = '$' + (15000 - totalSpent);
-            document.getElementById('pig-reimbursement').innerText = '$' + pigPaid;
-            document.getElementById('clean-reimbursement').innerText = '$' + cleanPaid;
-        } catch (e) {
-            console.error("抓取失敗:", e);
-        }
-    };
 </script>
+<iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="handleIframeLoad()"></iframe>
+
 </body>
 </html>
