@@ -9,22 +9,32 @@
     
     <script>
         var submitted = false;
+        // 確保這裡是用你提供的正確 CSV 連結
         const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTp-3jXGhNPGZhYixtC9vJ1GFCyBYRqU856YVEkUXJaTpsnNg48N3AMPsvbuAicL9XEFS00ibi0Ioh9/pub?output=csv';
         let expenseChart;
 
-        function handleIframeLoad() {
+        window.handleIframeLoad = function() {
             if (submitted) {
                 alert('✨ 紀錄成功！資料已同步 ✨');
                 location.reload();
             }
-        }
+        };
 
         async function fetchData() {
             try {
-                // 強制加上隨機參數避免快取
+                console.log("正在嘗試從 Google 抓取 CSV...");
                 const response = await fetch(`${csvUrl}&t=${Date.now()}`);
                 const data = await response.text();
-                const rows = data.split('\n').slice(1);
+                
+                // 檢查抓到的內容是不是 HTML (如果是 HTML 代表發佈格式還是錯的)
+                if (data.includes("<!DOCTYPE html>")) {
+                    console.error("錯誤：抓到的是網頁格式，不是 CSV。請檢查 Google 試算表發佈設定。");
+                    document.getElementById('recent-list').innerHTML = "資料格式錯誤，請確認發佈為 CSV";
+                    return;
+                }
+
+                const rows = data.split('\n').filter(r => r.trim() !== "").slice(1);
+                console.log("抓取到行數：", rows.length);
 
                 let totalSpent = 0;
                 let pigPaid = 0;
@@ -32,11 +42,10 @@
                 let categoryData = {};
                 let recentHtml = "";
 
-                // 先過濾無效列並反轉 (最新在後)
-                const validRows = rows.filter(r => r.trim() !== "");
-                
-                validRows.reverse().forEach((row, index) => {
-                    // 強化版 CSV 解析
+                // 將資料反轉，讓最新的排前面
+                const reversedRows = [...rows].reverse();
+
+                reversedRows.forEach((row, index) => {
                     const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/"/g, ""));
                     if (cols.length < 2) return;
 
@@ -58,9 +67,9 @@
                             <div class="flex justify-between text-sm border-b py-3">
                                 <div class="flex flex-col">
                                     <span class="font-medium text-gray-800">${cat}</span>
-                                    <span class="text-[10px] text-gray-400">${cols[0].split(' ')[0]}</span>
+                                    <span class="text-[10px] text-gray-400">${cols[0]}</span>
                                 </div>
-                                <span class="font-bold text-indigo-600">$${amount} <span class="text-[10px] text-gray-400">(${payer})</span></span>
+                                <span class="font-bold text-indigo-600">$${amount.toLocaleString()} <span class="text-[10px] text-gray-400">(${payer})</span></span>
                             </div>`;
                     }
                 });
@@ -68,20 +77,18 @@
                 document.getElementById('wallet-balance').innerText = '$' + (15000 - totalSpent).toLocaleString();
                 document.getElementById('pig-reimbursement').innerText = '$' + pigPaid.toLocaleString();
                 document.getElementById('clean-reimbursement').innerText = '$' + cleanPaid.toLocaleString();
-                document.getElementById('recent-list').innerHTML = recentHtml || "<p class='text-center py-4 text-gray-400'>尚無紀錄</p>";
+                document.getElementById('recent-list').innerHTML = recentHtml || "尚無紀錄";
 
-                // 確保 Chart.js 載入後再繪圖
-                setTimeout(() => updateChart(categoryData), 500);
+                renderChart(categoryData);
+
             } catch (e) { 
-                console.error("資料讀取錯誤:", e);
-                document.getElementById('recent-list').innerHTML = "資料讀取失敗，請確認網路或連結。";
+                console.error("fetchData 出現嚴重錯誤:", e);
             }
         }
 
-        function updateChart(catData) {
+        function renderChart(catData) {
             const ctx = document.getElementById('expenseChart');
             if (!ctx) return;
-            
             if (expenseChart) expenseChart.destroy();
             
             expenseChart = new Chart(ctx, {
@@ -91,16 +98,13 @@
                     datasets: [{
                         data: Object.values(catData),
                         backgroundColor: ['#6366f1', '#f87171', '#fbbf24', '#34d399', '#a78bfa', '#f472b6'],
-                        borderWidth: 2,
-                        hoverOffset: 4
+                        hoverOffset: 10
                     }]
                 },
-                options: { 
+                options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { 
-                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } 
-                    } 
+                    plugins: { legend: { position: 'bottom' } }
                 }
             });
         }
@@ -108,10 +112,8 @@
         function openTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active', 'border-indigo-600', 'text-indigo-600'));
-            
             document.getElementById(tabName).classList.add('active');
-            const activeBtn = document.getElementById('btn-' + tabName);
-            activeBtn.classList.add('active', 'border-indigo-600', 'text-indigo-600');
+            document.getElementById('btn-' + tabName).classList.add('active', 'border-indigo-600', 'text-indigo-600');
         }
 
         window.onload = fetchData;
@@ -119,66 +121,57 @@
 
     <style>
         .tab-content { display: none; }
-        .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .tab-content.active { display: block; }
     </style>
 </head>
-<body class="bg-gray-50 font-sans text-gray-900">
+<body class="bg-gray-50 font-sans">
 
-    <header class="bg-white shadow-sm sticky top-0 z-10 border-b border-gray-100">
+    <header class="bg-white shadow-sm sticky top-0 z-10">
         <div class="max-w-md mx-auto px-4 py-4 text-center">
-            <h1 class="text-lg font-black text-gray-800 tracking-tight">🐷 濟豬 & 淨淨的生活 🍯</h1>
+            <h1 class="text-xl font-black text-gray-800 tracking-tighter">🐷 濟豬 & 淨淨的生活 🍯</h1>
             <nav class="flex justify-around mt-4">
-                <button onclick="openTab('money')" id="btn-money" class="tab-btn active border-b-2 border-indigo-600 text-indigo-600 pb-2 px-4 font-bold transition-all">金錢</button>
-                <button onclick="openTab('mission')" id="btn-mission" class="tab-btn pb-2 px-4 font-bold text-gray-400 transition-all">任務</button>
-                <button onclick="openTab('body')" id="btn-body" class="tab-btn pb-2 px-4 font-bold text-gray-400 transition-all">體魄</button>
+                <button onclick="openTab('money')" id="btn-money" class="tab-btn active border-b-2 border-indigo-600 text-indigo-600 pb-2 px-4 font-bold">金錢</button>
+                <button onclick="openTab('mission')" id="btn-mission" class="tab-btn pb-2 px-4 font-bold text-gray-400">任務</button>
+                <button onclick="openTab('body')" id="btn-body" class="tab-btn pb-2 px-4 font-bold text-gray-400">體魄</button>
             </nav>
         </div>
     </header>
 
     <main class="max-w-md mx-auto p-4 pb-24">
         <section id="money" class="tab-content active">
-            <div class="bg-gradient-to-br from-indigo-600 to-violet-700 text-white p-6 rounded-3xl shadow-xl mb-6">
-                <p class="text-xs font-medium opacity-80 mb-1 italic">Monthly Wallet Balance</p>
-                <p id="wallet-balance" class="text-4xl font-black">...</p>
+            <div class="bg-indigo-600 text-white p-8 rounded-[2rem] shadow-xl mb-6 text-center">
+                <p class="text-xs opacity-70 mb-1">本月共同錢包餘額</p>
+                <p id="wallet-balance" class="text-4xl font-black">載入中...</p>
             </div>
 
-            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 mb-6">
-                <h3 class="font-bold text-gray-800 mb-4 flex items-center">
-                    <span class="bg-indigo-100 p-1.5 rounded-lg mr-2">📊</span> 支出比例分析
-                </h3>
-                <div class="relative h-64">
-                    <canvas id="expenseChart"></canvas>
-                </div>
+            <div class="bg-white p-6 rounded-[2rem] shadow-sm mb-6">
+                <h3 class="font-bold text-gray-800 mb-4">📊 支出比例</h3>
+                <div class="h-64"><canvas id="expenseChart"></canvas></div>
             </div>
 
             <div class="grid grid-cols-2 gap-4 mb-6">
-                <div class="bg-white p-4 rounded-2xl border-l-4 border-rose-400 shadow-sm">
-                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">應撥給濟豬</p>
+                <div class="bg-white p-5 rounded-2xl border-l-4 border-rose-400 shadow-sm">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase">應撥給濟豬</p>
                     <p id="pig-reimbursement" class="text-xl font-black text-gray-800">$0</p>
                 </div>
-                <div class="bg-white p-4 rounded-2xl border-l-4 border-sky-400 shadow-sm">
-                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">應撥給濟淨</p>
+                <div class="bg-white p-5 rounded-2xl border-l-4 border-sky-400 shadow-sm">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase">應撥給濟淨</p>
                     <p id="clean-reimbursement" class="text-xl font-black text-gray-800">$0</p>
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 mb-6">
-                <h3 class="font-bold text-gray-800 mb-3 flex items-center">
-                    <span class="bg-amber-100 p-1.5 rounded-lg mr-2">📜</span> 最近 5 筆花費
-                </h3>
-                <div id="recent-list" class="space-y-1 text-gray-600">載入中...</div>
+            <div class="bg-white p-6 rounded-[2rem] shadow-sm mb-6">
+                <h3 class="font-bold text-gray-800 mb-2">📜 最近 5 筆紀錄</h3>
+                <div id="recent-list" class="divide-y">正在讀取最新資料...</div>
             </div>
 
-            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-200">
-                <h3 class="font-bold text-gray-800 mb-4 flex items-center">
-                    <span class="bg-emerald-100 p-1.5 rounded-lg mr-2">✍️</span> 新增紀錄
-                </h3>
+            <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-200">
+                <h3 class="font-bold text-gray-800 mb-4">📝 記一筆帳</h3>
                 <form action="https://docs.google.com/forms/u/1/d/e/1FAIpQLSd3pRv9-m4Tkd0duGqCn3YkUb_cTYz2oP3GY5Ht5WwPOVG1KA/formResponse" 
                       method="POST" target="hidden_iframe" onsubmit="submitted=true;">
-                    <input type="date" name="entry.2029544290" class="w-full bg-gray-50 border-gray-100 border p-3 rounded-xl mb-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required>
-                    <input type="number" name="entry.1782400014" placeholder="輸入金額" class="w-full bg-gray-50 border-gray-100 border p-3 rounded-xl mb-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required>
-                    <select name="entry.1539739800" class="w-full bg-gray-50 border-gray-100 border p-3 rounded-xl mb-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <input type="date" name="entry.2029544290" class="w-full bg-gray-50 p-3 rounded-xl mb-3 text-sm" required>
+                    <input type="number" name="entry.1782400014" placeholder="金額" class="w-full bg-gray-50 p-3 rounded-xl mb-3 text-sm" required>
+                    <select name="entry.1539739800" class="w-full bg-gray-50 p-3 rounded-xl mb-3 text-sm">
                         <option value="飲食">🍕 飲食</option>
                         <option value="日用">🧺 日用</option>
                         <option value="設備">💻 設備</option>
@@ -186,17 +179,17 @@
                         <option value="社交">🥂 社交</option>
                     </select>
                     <div class="flex justify-around bg-gray-50 p-3 rounded-xl mb-4">
-                        <label class="text-xs font-bold cursor-pointer"><input type="radio" name="entry.1122156127" value="濟豬" required> 濟豬</label>
-                        <label class="text-xs font-bold cursor-pointer"><input type="radio" name="entry.1122156127" value="濟淨"> 濟淨</label>
-                        <label class="text-xs font-bold cursor-pointer"><input type="radio" name="entry.1122156127" value="共同錢包"> 共同</label>
+                        <label class="text-xs font-bold"><input type="radio" name="entry.1122156127" value="濟豬" required> 濟豬</label>
+                        <label class="text-xs font-bold"><input type="radio" name="entry.1122156127" value="濟淨"> 濟淨</label>
+                        <label class="text-xs font-bold"><input type="radio" name="entry.1122156127" value="共同錢包"> 共同</label>
                     </div>
-                    <button type="submit" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-indigo-700 transition-colors">卍o爻記錄一筆o卍</button>
+                    <button type="submit" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black shadow-lg">送出紀錄</button>
                 </form>
             </div>
         </section>
-
-        <section id="mission" class="tab-content text-center py-20 text-gray-400">任務功能正在趕工中...</section>
-        <section id="body" class="tab-content text-center py-20 text-gray-400">體魄功能正在趕工中...</section>
+        
+        <section id="mission" class="tab-content text-center py-20 text-gray-400">任務開發中...</section>
+        <section id="body" class="tab-content text-center py-20 text-gray-400">體格開發中...</section>
     </main>
 
     <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="handleIframeLoad()"></iframe>
