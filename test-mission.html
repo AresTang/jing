@@ -1,1 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任務系統測試版</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; background: #f8fafc; padding: 20px; }
+        .glass-card { background: white; border: 2px solid #e2e8f0; border-radius: 1.5rem; box-shadow: 4px 4px 0px rgba(0,0,0,0.05); }
+        .star-rank { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: white; padding: 15px; border-radius: 20px; display: flex; gap: 15px; }
+    </style>
+</head>
+<body>
 
+    <div class="max-w-md mx-auto">
+        <h1 class="text-2xl font-black mb-6">⚔️ 冒險公會測試看板</h1>
+        <div id="mission-list" class="space-y-4">讀取 CSV 中...</div>
+    </div>
+
+    <div class="star-rank">
+        <div class="text-center">
+            <div class="text-[10px] text-slate-400">PIG</div>
+            <div id="pig-stars" class="text-xl font-black text-orange-400">0</div>
+        </div>
+        <div class="w-px bg-slate-700"></div>
+        <div class="text-center">
+            <div class="text-[10px] text-slate-400">CLEAN</div>
+            <div id="clean-stars" class="text-xl font-black text-sky-400">0</div>
+        </div>
+        <div class="text-amber-400 text-xl">★</div>
+    </div>
+
+    <script>
+        const missionCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vReqxmxhuQDkUSk06cNNlGU-R2HQZqD1IeLIDL3J1lQIPXNpJp47IUikBoF_Uh3FqmuZ9BsVNdpLbA5/pub?output=csv';
+
+        async function testMissions() {
+            try {
+                const res = await fetch(`${missionCsvUrl}&t=${Date.now()}`);
+                const text = await res.text();
+                const rows = text.split('\n').filter(r => r.trim() !== "").slice(1);
+                
+                let pigStars = 0, cleanStars = 0, html = "";
+                const today = new Date().toLocaleDateString('en-CA'); // 格式 YYYY-MM-DD
+
+                rows.forEach(row => {
+                    // 這裡的索引需對應你的試算表欄位順序
+                    const c = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/"/g, ""));
+                    const name = c[0], star = parseInt(c[1]) || 0, type = c[2], status = c[3], cycle = c[4], lastDate = c[5], lastUser = c[6];
+
+                    // 1. 統計星星
+                    if (status === "已完成") {
+                        if (lastUser === "濟豬") pigStars += star;
+                        if (lastUser === "濟淨") cleanStars += star;
+                    }
+
+                    // 2. 顯示邏輯
+                    const isDaily = (type === "日常");
+                    const alreadyDoneToday = (lastDate === today);
+                    const shouldShow = (status === "進行中") || (isDaily && !alreadyDoneToday);
+
+                    if (shouldShow) {
+                        html += `
+                            <div class="glass-card p-6 flex justify-between items-center border-l-8 ${isDaily ? 'border-slate-200' : 'border-orange-200'}">
+                                <div>
+                                    <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${type} · ★ ${star}</div>
+                                    <div class="text-lg font-black text-slate-800">${name}</div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="alert('點擊了豬')" class="w-10 h-10 rounded-full border-2 border-orange-400 text-orange-400 font-bold">豬</button>
+                                    <button onclick="alert('點擊了淨')" class="w-10 h-10 rounded-full border-2 border-sky-400 text-sky-400 font-bold">淨</button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+
+                document.getElementById('mission-list').innerHTML = html || "目前無待辦任務";
+                document.getElementById('pig-stars').innerText = pigStars;
+                document.getElementById('clean-stars').innerText = cleanStars;
+            } catch (e) {
+                document.getElementById('mission-list').innerHTML = "讀取失敗，請檢查 CSV 連結是否正確發佈。";
+            }
+        }
+        testMissions();
+    </script>
+</body>
+</html>
